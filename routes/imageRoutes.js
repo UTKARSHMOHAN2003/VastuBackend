@@ -15,8 +15,11 @@ router.get('/:id/data', imageController.getImageData);
 // POST new image(s) - supports multiple uploads
 router.post('/', upload.array('images', 10), imageController.createImage);
 
-// PUT update image
+// PUT update image metadata
 router.put('/:id', imageController.updateImage);
+
+// PUT update image file
+router.put('/:id/file', upload.single('image'), imageController.updateImageFile);
 
 // DELETE image
 router.delete('/:id', imageController.deleteImage);

@@ -185,6 +185,50 @@ const createImage = async (req, res) => {
   }
 };
 
+// Update image file
+const updateImageFile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ message: 'Please upload an image file' });
+    }
+    
+    // Check if image exists
+    const checkResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query('SELECT * FROM Images WHERE id = @id AND isActive = 1');
+    
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({ message: 'Image not found' });
+    }
+    
+    // Convert file buffer to base64
+    const imageData = req.file.buffer.toString('base64');
+    const contentType = req.file.mimetype;
+    
+    // Update image file data
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('image_data', sql.VarBinary(sql.MAX), Buffer.from(imageData, 'base64'))
+      .input('content_type', sql.NVarChar(100), contentType)
+      .query(`
+        UPDATE Images
+        SET image_data = @image_data, content_type = @content_type
+        WHERE id = @id;
+      `);
+    
+    res.json({
+      message: 'Image file updated successfully',
+      image_id: id
+    });
+  } catch (err) {
+    console.error('Error updating image file:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
 // Update image
 const updateImage = async (req, res) => {
   try {
@@ -397,6 +441,7 @@ module.exports = {
   getImageById,
   createImage,
   updateImage,
+  updateImageFile,
   deleteImage,
   getImageData,
   regenerateAccessToken,
