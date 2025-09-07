@@ -14,13 +14,19 @@ const app = express();
 
 // Connect to database and initialize tables
 const setupDatabase = async () => {
-  await connectDB();
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error("Failed to setup database:", err);
+    // Don't exit in production/serverless environment
+    if (process.env.NODE_ENV !== 'production') {
+      process.exit(1);
+    }
+  }
 };
 
-setupDatabase().catch((err) => {
-  console.error("Failed to setup database:", err);
-  process.exit(1);
-});
+// Setup database (non-blocking for serverless)
+setupDatabase();
 
 // Middleware
 app.use(cors());
