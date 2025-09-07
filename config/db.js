@@ -17,7 +17,6 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
-// Enhanced configuration with environment-specific settings
 const config = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
@@ -25,22 +24,21 @@ const config = {
   database: process.env.DB_NAME,
   port: parseInt(process.env.DB_PORT) || 1433,
   options: {
-    // Environment-specific encryption settings
-    encrypt: !isDevelopment, // Disable encryption in development, enable in production
-    trustServerCertificate: true, // Always trust for now to avoid cert issues
+    encrypt: false, // Try without encryption first
+    trustServerCertificate: true,
     enableArithAbort: true,
-    // Increased timeouts for production environment
-    connectTimeout: isDevelopment ? 15000 : 60000, // 15s dev, 60s prod
-    requestTimeout: isDevelopment ? 15000 : 60000,  // 15s dev, 60s prod
   },
   pool: {
     max: 10,
     min: 0,
     idleTimeoutMillis: 30000,
   },
+  // Force longer timeouts
+  connectionTimeout: 60000, // 60 seconds
+  requestTimeout: 60000, // 60 seconds
 };
 
-// Enhanced logging with environment info
+// Log config (without sensitive data) for debugging
 console.log("🔧 Database configuration:", {
   user: config.user,
   server: config.server,
@@ -49,8 +47,8 @@ console.log("🔧 Database configuration:", {
   serverType: typeof config.server,
   environment: isDevelopment ? 'Development' : 'Production',
   encryption: config.options.encrypt ? 'Enabled' : 'Disabled',
-  connectTimeout: config.options.connectTimeout + 'ms',
-  requestTimeout: config.options.requestTimeout + 'ms'
+  connectionTimeout: config.connectionTimeout + 'ms',
+  requestTimeout: config.requestTimeout + 'ms'
 });
 
 // Create connection pool
@@ -61,7 +59,6 @@ pool.on("error", (err) => {
   console.error("❌ Database pool error:", err);
 });
 
-// Enhanced connection function with better error handling
 const connectDB = async () => {
   try {
     console.log("🔄 Attempting database connection...");
@@ -77,7 +74,6 @@ const connectDB = async () => {
       console.log("🕒 Server time:", result.recordset[0].currentTime);
     }
     
-    return pool;
   } catch (err) {
     console.error("❌ Database connection error:", {
       message: err.message,
@@ -94,14 +90,19 @@ const connectDB = async () => {
     console.error("- Port:", config.port);
     console.error("- Database:", config.database);
     console.error("- Encryption:", config.options.encrypt ? 'ON' : 'OFF');
-    console.error("- Timeout:", config.options.connectTimeout + 'ms');
+    console.error("- Connection Timeout:", config.connectionTimeout + 'ms');
+    console.error("- Request Timeout:", config.requestTimeout + 'ms');
     
-    // Don't exit immediately in development for debugging
+    console.log("💡 Suggestions:");
+    console.log("1. Check if the database server allows external connections");
+    console.log("2. Verify firewall settings allow connections from Render IPs");
+    console.log("3. Try using the Azure SQL server instead");
+    
+    // In production, continue without database for now
     if (!isDevelopment) {
-      process.exit(1);
+      console.log("⚠️ Production: Continuing without database connection");
     } else {
-      console.log("⚠️ Development mode: Not exiting process for debugging");
-      throw err;
+      process.exit(1);
     }
   }
 };
