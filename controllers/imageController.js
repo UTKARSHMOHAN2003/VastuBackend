@@ -1,8 +1,17 @@
 const sql = require("mssql");
-const { pool } = require("../config/db");
+const { getConnection } = require("../config/db");
 const crypto = require("crypto");
 
-// Get all images
+// Helper function to get database connection
+const getDbConnection = async () => {
+  try {
+    return await getConnection();
+  } catch (error) {
+    console.error("Failed to get database connection:", error);
+    throw new Error("Database connection failed");
+  }
+};
+
 // Get all images
 const getAllImages = async (req, res) => {
   try {
@@ -33,6 +42,7 @@ const getAllImages = async (req, res) => {
 
     query += " ORDER BY uploadDate DESC";
 
+    const pool = await getDbConnection();
     let request = pool.request();
     for (const [key, value] of Object.entries(params)) {
       request = request.input(key, value);
@@ -74,6 +84,7 @@ const getImageById = async (req, res) => {
     const { id } = req.params;
     const { access_token } = req.query;
 
+    const pool = await getDbConnection();
     const result = await pool.request().input("id", sql.Int, id).query(`
         SELECT id, title, description, category, project_id, 
                content_type, uploadDate, access_token 
@@ -122,6 +133,7 @@ const createImage = async (req, res) => {
       : "unbuilt";
 
     if (project_id) {
+      const pool = await getDbConnection();
       const projectImagesCount = await pool
         .request()
         .input("project_id", sql.Int, project_id)
@@ -154,6 +166,7 @@ const createImage = async (req, res) => {
 
       console.log("Creating image with access_token:", access_token); // Debug log
 
+      const pool = await getDbConnection();
       const insertResult = await pool
         .request()
         .input("title", sql.NVarChar(255), title)
@@ -209,6 +222,7 @@ const updateImage = async (req, res) => {
       ? category
       : "unbuilt";
 
+    const pool = await getDbConnection();
     const checkResult = await pool
       .request()
       .input("id", sql.Int, id)
@@ -287,6 +301,7 @@ const getImageData = async (req, res) => {
     const { id } = req.params;
     const { access_token } = req.query;
 
+    const pool = await getDbConnection();
     // First get the image info including access requirements
     const checkAccess = await pool
       .request()
@@ -342,6 +357,7 @@ const regenerateAccessToken = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const pool = await getDbConnection();
     // Get project_id from the image
     const imageResult = await pool
       .request()
@@ -392,6 +408,7 @@ const deleteImage = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const pool = await getDbConnection();
     const imageResult = await pool
       .request()
       .input("id", sql.Int, id)
@@ -422,6 +439,7 @@ const updateImageFile = async (req, res) => {
       return res.status(400).json({ message: "Please upload an image file" });
     }
 
+    const pool = await getDbConnection();
     const checkResult = await pool
       .request()
       .input("id", sql.Int, id)
@@ -458,6 +476,7 @@ const revokeAccess = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const pool = await getDbConnection();
     const checkResult = await pool
       .request()
       .input("id", sql.Int, id)
@@ -494,6 +513,7 @@ const getProjectById = async (req, res) => {
     const { projectId } = req.params;
     const { access_token } = req.query;
 
+    const pool = await getDbConnection();
     const result = await pool
       .request()
       .input("projectId", sql.Int, projectId)
@@ -535,6 +555,7 @@ const getProjectFiles = async (req, res) => {
       return res.status(400).json({ message: "Missing required parameters" });
     }
 
+    const pool = await getDbConnection();
     const result = await pool
       .request()
       .input("project_id", sql.Int, project_id)
