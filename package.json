@@ -1,12 +1,13 @@
 {
   "name": "vastubackend",
   "version": "1.0.0",
-  "description": "��#\u0000 \u0000v\u0000a\u0000s\u0000t\u0000u\u0000b\u0000a\u0000c\u0000k\u0000e\u0000n\u0000d\u0000\r\u0000 \u0000",
+  "description": "Vastu Backend API",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "echo \"No build step required\""
   },
   "author": "",
   "license": "ISC",
