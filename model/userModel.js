@@ -1,4 +1,4 @@
-const { pool, sql } = require("../config/db");
+const { getConnection, sql } = require("../config/db");
 
 /**
  * Fetch user by username
@@ -7,6 +7,7 @@ const { pool, sql } = require("../config/db");
  */
 const getUserByUsername = async (username) => {
   try {
+    const pool = await getConnection();
     const request = pool.request();
     request.input("username", sql.NVarChar, username);
 
