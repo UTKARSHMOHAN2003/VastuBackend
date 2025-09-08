@@ -23,23 +23,36 @@ const config = {
   database: process.env.DB_NAME,
   port: parseInt(process.env.DB_PORT) || 1433,
   options: {
-    encrypt: true, // Use encryption (required for Azure SQL)
-    trustServerCertificate: process.env.SERVER && process.env.SERVER.includes('database.windows.net') ? false : true,
+    encrypt: true, // Required for Azure SQL and most cloud providers
+    trustServerCertificate: false, // Set to false for production security
     enableArithAbort: true,
-    connectTimeout: 30000, // 30 seconds
-    requestTimeout: 30000, // 30 seconds
-    connectionRetryInterval: 2000, // 2 seconds
-    maxRetriesOnFailure: 3,
+    connectTimeout: 60000, // Increased to 60 seconds
+    requestTimeout: 60000, // Increased to 60 seconds
+    connectionRetryInterval: 3000, // 3 seconds
+    maxRetriesOnFailure: 5, // Increased retry attempts
+    // Additional options for cloud connectivity
+    enableAnsiNullDefault: true,
+    enableAnsiNull: true,
+    enableAnsiWarnings: true,
+    enableConcatNullYieldsNull: true,
+    enableCursorCloseOnCommit: true,
+    enableImplicitTransactions: false,
+    enableQuotedIdentifiers: true,
+    enableAnsiPadding: true,
+    // SSL/TLS options for better connectivity
+    cryptoCredentialsDetails: {
+      minVersion: 'TLSv1.2'
+    }
   },
   pool: {
-    max: 10,
+    max: 5, // Reduced for serverless
     min: 0,
     idleTimeoutMillis: 30000,
-    acquireTimeoutMillis: 30000,
-    createTimeoutMillis: 30000,
+    acquireTimeoutMillis: 60000, // Increased timeout
+    createTimeoutMillis: 60000, // Increased timeout
     destroyTimeoutMillis: 5000,
     reapIntervalMillis: 1000,
-    createRetryIntervalMillis: 200,
+    createRetryIntervalMillis: 500, // Faster retry
   },
 };
 
@@ -52,17 +65,45 @@ console.log("Database config:", {
   serverType: typeof config.server,
 });
 
+// Alternative Azure SQL Database connection string method
+const getAzureConnectionString = () => {
+  if (process.env.AZURE_CONNECTION_STRING) {
+    return process.env.AZURE_CONNECTION_STRING;
+  }
+  
+  // Build connection string from individual components
+  const server = process.env.SERVER;
+  const database = process.env.DB_NAME;
+  const user = process.env.DB_USER;
+  const password = process.env.DB_PASSWORD;
+  const port = process.env.DB_PORT || 1433;
+  
+  return `Server=${server},${port};Database=${database};User Id=${user};Password=${password};Encrypt=true;TrustServerCertificate=false;Connection Timeout=60;`;
+};
+
 // Global connection pool - will be created on first use
 let pool = null;
 
 // Create connection pool with retry logic
-const createPool = async () => {
+const createPool = async (retryCount = 0) => {
   if (pool && pool.connected) {
     return pool;
   }
 
+  const maxRetries = 3;
+  const retryDelay = 2000; // 2 seconds
+
   try {
-    pool = new sql.ConnectionPool(config);
+    console.log(`Attempting to connect to SQL Server (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+    
+    // Try connection string method first (better for Azure SQL)
+    if (retryCount === 0 && process.env.AZURE_CONNECTION_STRING) {
+      console.log("Trying Azure connection string method...");
+      pool = new sql.ConnectionPool(process.env.AZURE_CONNECTION_STRING);
+    } else {
+      console.log("Trying config object method...");
+      pool = new sql.ConnectionPool(config);
+    }
     
     // Global error handler for database connection
     pool.on("error", (err) => {
@@ -74,13 +115,22 @@ const createPool = async () => {
     console.log("✅ Connected to SQL Server -", process.env.DB_NAME);
     return pool;
   } catch (err) {
-    console.error("❌ Database connection error:", {
+    console.error(`❌ Database connection error (attempt ${retryCount + 1}):`, {
       message: err.message,
       code: err.code,
       state: err.state,
       originalError: err.originalError,
     });
+    
     pool = null;
+    
+    // Retry logic for ESOCKET and connection errors
+    if (retryCount < maxRetries && (err.code === 'ESOCKET' || err.code === 'ETIMEOUT' || err.code === 'ECONNREFUSED')) {
+      console.log(`Retrying connection in ${retryDelay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      return createPool(retryCount + 1);
+    }
+    
     throw err;
   }
 };
@@ -131,4 +181,5 @@ module.exports = {
   sql,
   connectDB,
   testConnection,
+  getAzureConnectionString,
 };
